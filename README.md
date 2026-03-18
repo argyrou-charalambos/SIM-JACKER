@@ -1,5 +1,5 @@
 ================================================================================
-SIMJACKER EXPERT MVP - Version Professionnelle
+SIMJACKER MVP - Version Professionnelle
 ================================================================================
 Auteur: Expert OSINT & Sécurité Télécom
 Date: 2026
