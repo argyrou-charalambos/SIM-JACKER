@@ -1,3 +1,25 @@
+================================================================================
+SIMJACKER EXPERT MVP - Version Professionnelle
+================================================================================
+Auteur: Expert OSINT & Sécurité Télécom
+Date: 2026
+Compatibilité: Ubuntu 22.04/24.04 avec Samsung en mode modem
+
+Ce script unique intègre :
+- Connexion automatique au modem GSM via USB
+- Envoi de commandes SIM Toolkit (S@T) authentiques [citation:2]
+- Gestion des réponses SIM (status words ISO 7816)
+- Serveur C2 intégré (Flask) avec tunnel Serveo.net
+- Tests multiples avec gestion des timeouts
+- Interface interactive pour debug
+
+Utilisation :
+  1. Active le mode modem/débogage USB sur le Samsung 
+  2. Connecte le téléphone au PC
+  3. Lance ce script
+  4. Suis le menu interactif
+================================================================================
+
 🚀 GUIDE D'UTILISATION 
 
 Étape 1: Préparer le Samsung 
