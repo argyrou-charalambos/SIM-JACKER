@@ -1,4 +1,4 @@
-🚀 GUIDE D'UTILISATION PAS À PAS
+🚀 GUIDE D'UTILISATION 
 
 Étape 1: Préparer le Samsung 
 
