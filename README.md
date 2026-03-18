@@ -12,7 +12,6 @@ Connecte le téléphone au PC via câble USB
 
 Étape 2: Identifier le port modem sur PC
 
-
 # Après connexion, vérifier le port
 
 ls /dev/ttyACM* 2>/dev/null || ls /dev/ttyUSB*
@@ -20,10 +19,11 @@ ls /dev/ttyACM* 2>/dev/null || ls /dev/ttyUSB*
 Si le port est différent de /dev/ttyACM0, modifie la variable MODEM_PORT dans la config.
 
 Étape 3: Installer les dépendances
+
 pip3 install pyserial flask requests --break-system-packages
 
 Étape 4: Lancer le script
-python3 simjacker_expert.py
+python3 simjacker.py
 
 Étape 5: Suivre le menu interactif
 
@@ -34,14 +34,18 @@ Option 2 : Démarre le serveur C2
 Option 3 : Lance tous les tests automatiquement
 
 📊 RÉSULTAT ATTENDU
+
 Si la carte SIM est vulnérable et que le tag est correct, tu verras :
 
 text
-🎯 LOCALISATION REÇUE !
-📱 IMEI: 351234567890123
-📍 -4.3056, 15.2935
-🔗 https://maps.google.com/?q=-4.3056,15.2935
 
+🎯 LOCALISATION REÇUE !
+
+📱 IMEI: 351234567890123
+
+📍 -4.3056, 15.2935
+
+🔗 https://maps.google.com/?q=-4.3056,15.2935
 
 🔧 DÉPANNAGE RAPIDE
 
