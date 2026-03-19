@@ -96,7 +96,7 @@ python
 
 CONFIG = {
     # ----- NUMÉROS TÉLÉPHONIQUES -----
-    "NUMERO_CIBLE": "+243839898872",      # La cible
+    "NUMERO_CIBLE": "+243XXXXXXXXX",      # La cible
     "NUMERO_COMPLICE": "+243XXXXXXXXX",   # Ton numéro pour réception
     
     # ----- MODEM -----
