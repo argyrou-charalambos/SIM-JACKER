@@ -71,8 +71,8 @@ text
 2. Installation sur PC
 bash
 # Cloner le dépôt
-git clone https://github.com/votre-repo/simjacker-ultimate.git
-cd simjacker-ultimate
+git clone https://github.com/argyrou-charalambos/SIM-JACKER/
+cd SIM-JACKER
 
 # Installer les dépendances
 sudo apt update
