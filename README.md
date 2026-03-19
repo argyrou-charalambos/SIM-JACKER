@@ -1,20 +1,8 @@
-# 🔥 SIMJACKER ULTIMATE – Système de Localisation par SMS Binaire
+#  SIMJACKER  – Système de Localisation par SMS Binaire
 
 ![Version](https://img.shields.io/badge/version-3.0-blue)
 ![License](https://img.shields.io/badge/license-Éducatif%20uniquement-red)
 ![Status](https://img.shields.io/badge/status-Production%20Ready-brightgreen)
-
-## 📋 TABLE DES MATIÈRES
-1. [Présentation](#-présentation)
-2. [Architecture du système](#-architecture-du-système)
-3. [Prérequis matériels](#-prérequis-matériels)
-4. [Installation](#-installation)
-5. [Configuration](#-configuration)
-6. [Utilisation](#-utilisation)
-7. [Fonctionnement détaillé](#-fonctionnement-détaillé)
-8. [Dépannage](#-dépannage)
-9. [Limitations](#-limitations)
-10. [Aspects légaux](#-aspects-légaux)
 
 ---
 
